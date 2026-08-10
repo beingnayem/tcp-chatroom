@@ -64,7 +64,7 @@ erDiagram
 
     users {
         INTEGER id PK
-        VARCHAR username UNIQUE
+        VARCHAR username
         VARCHAR password_hash
         VARCHAR status
         TIMESTAMP last_seen
@@ -78,7 +78,7 @@ erDiagram
 
     rooms {
         INTEGER id PK
-        VARCHAR name UNIQUE
+        VARCHAR name
         INTEGER creator_id FK
     }
 
