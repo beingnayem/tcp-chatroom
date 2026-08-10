@@ -41,9 +41,10 @@ graph TD
 
     ClientSock <--> TLSClient
     TLSServer <--> Acceptor
-```
+  ```
 
 ### Component Details
+
 * **PySide6 UI Thread**: Orchestrates the user interface elements (Login, Chat workspace, Admin console) completely decoupled from TCP socket loop blocking.
 * **QTimer Queue Poller**: Checks the incoming queue every 100ms thread-safely, preventing GUI freezes.
 * **Client Handlers**: Independent threads spawned per client on the server to handle incoming packets concurrently.
@@ -125,6 +126,7 @@ erDiagram
 To support chunked transfer, resume logic, and integrity verification, the client and server exchange custom JSON-framed packets:
 
 ### Framing Format
+
 Each network packet is framed using a 4-byte big-endian integer specifying payload size, followed by the raw JSON payload.
 
 ### Handshake Sequence & Resume Logic
@@ -158,7 +160,9 @@ sequenceDiagram
 ## 4. API Packet Definitions
 
 ### A. Authentication
+
 #### Register Account (`REGISTER`)
+
 ```json
 {
   "message_type": "REGISTER",
@@ -170,6 +174,7 @@ sequenceDiagram
 ```
 
 #### Login (`LOGIN`)
+
 ```json
 {
   "message_type": "LOGIN",
@@ -181,7 +186,9 @@ sequenceDiagram
 ```
 
 ### B. Messages & Presence
+
 #### Send Room Message (`MSG`)
+
 ```json
 {
   "message_type": "MSG",
@@ -193,6 +200,7 @@ sequenceDiagram
 ```
 
 #### Send Private Message (`PM`)
+
 ```json
 {
   "message_type": "PM",
@@ -204,6 +212,7 @@ sequenceDiagram
 ```
 
 #### Presence Broadcast (`PRESENCE`)
+
 ```json
 {
   "message_type": "PRESENCE",
@@ -215,7 +224,9 @@ sequenceDiagram
 ```
 
 ### C. Admin & Moderation
+
 #### Promotion (`PROMOTE_USER`)
+
 ```json
 {
   "message_type": "PROMOTE_USER",
@@ -232,7 +243,7 @@ sequenceDiagram
 
 The desktop GUI implements a modern dark-mode aesthetic with standard view navigation:
 
-```
+```text
 +-----------------------------------------------------------------+
 | Login / Register View                                           |
 |                                                                 |
@@ -259,15 +270,18 @@ Transitions to:
 | [Admin Dashboard] | Active File Status Panel     |              |
 | [Log Out]         | ProgressBar [==========] 45% |              |
 +-------------------+------------------------------+--------------+
-```
+```text
++-----------------------------------------------------------------+
 
 ---
 
 ## 6. Installation & Certification
 
 ### Dependencies Setup
+
 1. Clone the repository and navigate into the workspace.
 2. Initialize virtual environment:
+
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
@@ -275,12 +289,15 @@ Transitions to:
    ```
 
 ### SSL/TLS Certificate Generation
+
 Generate standard self-signed certificate keys in the root directory:
+
 ```bash
 openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout server.key -out server.crt -subj "/CN=localhost"
 ```
 
 ### Running the System
+
 * **Server**: `python server/main.py`
 * **Desktop GUI Client**: `python client/gui/app.py`
 * **CLI Client (alternative)**: `python client/main.py`
@@ -292,13 +309,17 @@ openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 -keyout server.key -out
 The system includes test suites covering unit functions and integration performance.
 
 ### A. Run Unit Tests (PyTest)
+
 Executes database, protocol parsing, and encryption validation tests:
+
 ```bash
 pytest tests/test_secure_chat.py
 ```
 
 ### B. Run Performance Load Simulation
+
 Starts a performance test simulating 50 clients, message flood throughput, connection drops, and 5MB chunked transfers:
+
 ```bash
 python tests/test_performance_integration.py
 ```
@@ -310,7 +331,9 @@ python tests/test_performance_integration.py
 To deploy the server in a production Linux environment:
 
 ### 1. Configure Systemd Daemon Service
+
 Create a systemd unit service file `/etc/systemd/system/secure-chat.service`:
+
 ```ini
 [Unit]
 Description=Secure TLS TCP Chat Server
@@ -329,6 +352,7 @@ WantedBy=multi-user.target
 ```
 
 ### 2. Enable and Start Service
+
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl enable secure-chat.service
