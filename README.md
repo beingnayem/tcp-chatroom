@@ -10,7 +10,7 @@ The application implements a decoupled, event-driven client-server architecture 
 
 ```mermaid
 graph TD
-    subgraph Client Application (PySide6)
+    subgraph "Client Application (PySide6)"
         GUI[PySide6 UI Thread]
         QueueTimer[QTimer Queue Poller]
         ClientSock[SocketClient Thread]
@@ -21,13 +21,13 @@ graph TD
         Uploader -->|TCP Stream| ClientSock
     end
 
-    subgraph TLS Cryptographic Layer
+    subgraph "TLS Cryptographic Layer"
         TLSClient[ssl.PROTOCOL_TLS_CLIENT]
         TLSServer[ssl.PROTOCOL_TLS_SERVER]
         TLSClient <-->|Encrypted TCP/IP Tunnel| TLSServer
     end
 
-    subgraph Secure Server (Multithreaded)
+    subgraph "Secure Server (Multithreaded)"
         Acceptor[Acceptor Thread]
         Handler[Client Handler Threads]
         Presence[Presence Daemon Thread]
@@ -270,8 +270,7 @@ Transitions to:
 | [Admin Dashboard] | Active File Status Panel     |              |
 | [Log Out]         | ProgressBar [==========] 45% |              |
 +-------------------+------------------------------+--------------+
-```text
-+-----------------------------------------------------------------+
+```
 
 ---
 

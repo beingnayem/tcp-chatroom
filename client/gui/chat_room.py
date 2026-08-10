@@ -44,6 +44,10 @@ class ChatRoomWidget(QWidget):
         self.online_timer.timeout.connect(self._request_online_list)
         self.online_timer.start(5000)
 
+        # Request General room history immediately on startup
+        if self.client.connected:
+            self.client.send_packet(Packet("GET_ROOM_HISTORY", payload={"room": "General"}))
+
     def _init_ui(self):
         self.setStyleSheet("""
             QWidget {
@@ -307,6 +311,9 @@ class ChatRoomWidget(QWidget):
         self.current_room = room_name
         self.room_header_label.setText(f"Room: #{self.current_room}")
         self._refresh_chat_display()
+        self._request_online_list()
+        if self.client.connected:
+            self.client.send_packet(Packet("GET_ROOM_HISTORY", payload={"room": self.current_room}))
         self.chat_display.append(f"<font color='#528bff'><b>[SYSTEM] Chat context switched to #{self.current_room}</b></font>")
 
     def _handle_create_room(self):
@@ -481,7 +488,7 @@ class ChatRoomWidget(QWidget):
 
     def _request_online_list(self):
         if self.client.connected:
-            packet = Packet(message_type="GET_ONLINE_LIST", payload={})
+            packet = Packet(message_type="GET_ONLINE_LIST", payload={"room": self.current_room})
             self.client.send_packet(packet)
 
     def _check_network_queue(self):
@@ -554,7 +561,9 @@ class ChatRoomWidget(QWidget):
                     users = payload.get("online_users", [])
                     self.user_list_widget.clear()
                     for u in users:
-                        self.user_list_widget.addItem(f"{u['username']} ({u['status']})")
+                        status = u.get("status", "Offline")
+                        icon = "🟢" if status == "Online" else "🟡" if status == "Idle" else "⚫"
+                        self.user_list_widget.addItem(f"{u['username']} ({icon} {status})")
 
                 elif mtype == "ROLE_UPDATE":
                     new_role = payload.get("role")

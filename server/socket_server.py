@@ -278,21 +278,42 @@ class SocketServer:
             logger.info(f"User '{logged_in_user}' logged out from {client_address}")
 
         elif mtype == "GET_ONLINE_LIST":
-            online_list = []
-            with self.lock:
-                for addr, s in self.sessions.items():
-                    online_list.append({
-                        "username": s["username"],
-                        "status": s["status"]
-                    })
-            resp = Packet(
-                message_type="ONLINE_LIST_RESP",
-                sender="SERVER",
-                receiver=logged_in_user,
-                room=None,
-                payload={"online_users": online_list}
-            )
-            send_framed_packet(client_socket, resp)
+            room_name = payload.get("room", "General").strip() or "General"
+            try:
+                if room_name == "General":
+                    users_data = self.db_manager.fetch_all("""
+                        SELECT username, status FROM users
+                        ORDER BY CASE status
+                            WHEN 'Online' THEN 1
+                            WHEN 'Idle' THEN 2
+                            WHEN 'Offline' THEN 3
+                            ELSE 4
+                        END ASC, username ASC;
+                    """)
+                else:
+                    users_data = self.db_manager.fetch_all("""
+                        SELECT users.username, users.status
+                        FROM room_members
+                        JOIN users ON room_members.user_id = users.id
+                        WHERE room_members.room_id = (SELECT id FROM rooms WHERE name = ?)
+                        ORDER BY CASE users.status
+                            WHEN 'Online' THEN 1
+                            WHEN 'Idle' THEN 2
+                            WHEN 'Offline' THEN 3
+                            ELSE 4
+                        END ASC, users.username ASC;
+                    """, (room_name,))
+                
+                resp = Packet(
+                    message_type="ONLINE_LIST_RESP",
+                    sender="SERVER",
+                    receiver=logged_in_user,
+                    room=room_name,
+                    payload={"online_users": users_data}
+                )
+                send_framed_packet(client_socket, resp)
+            except DatabaseError as e:
+                self._send_error(client_socket, f"Error fetching room members: {e}")
 
         elif mtype == "PM":
             recipient_username = packet.receiver
@@ -860,6 +881,18 @@ class SocketServer:
                 send_framed_packet(client_socket, resp)
             except DatabaseError as e:
                 self._send_error(client_socket, f"Error fetching rooms list: {e}")
+
+        elif mtype == "GET_ROOM_HISTORY":
+            room_name = payload.get("room", "").strip()
+            if not room_name:
+                self._send_error(client_socket, "Room name required to fetch history.")
+                return
+            with self.lock:
+                joined_rooms = self.client_rooms.get(client_address, set())
+            if room_name in joined_rooms:
+                self._send_room_history(client_socket, room_name)
+            else:
+                self._send_error(client_socket, f"Access Denied: You are not a member of room '{room_name}'.")
 
         elif mtype == "LEAVE_ROOM":
             room_name = payload.get("room", "").strip()

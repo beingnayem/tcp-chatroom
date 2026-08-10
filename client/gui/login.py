@@ -10,6 +10,7 @@ class LoginWidget(QWidget):
         super().__init__()
         self.client = client
         self.main_window = main_window
+        self.is_register_mode = False
         
         self._init_ui()
         
@@ -25,50 +26,73 @@ class LoginWidget(QWidget):
 
     def _init_ui(self):
         self.setStyleSheet("""
+            LoginWidget {
+                background: transparent;
+            }
             QWidget {
-                background-color: #1e222b;
                 color: #abb2bf;
-                font-family: 'Segoe UI', Roboto, sans-serif;
+                font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                 font-size: 14px;
             }
             QLabel {
-                color: #abb2bf;
+                background: transparent;
+                color: #8a92a5;
+                font-weight: 500;
             }
             QLabel#titleLabel {
                 color: #ffffff;
                 font-size: 24px;
-                font-weight: bold;
+                font-weight: 800;
+                letter-spacing: 0.5px;
+            }
+            QLabel#fieldLabel {
+                color: #8a92a5;
+                font-size: 11px;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             QLineEdit {
-                background-color: #282c34;
-                border: 1px solid #3e4451;
-                border-radius: 6px;
-                padding: 10px;
+                background-color: rgba(0, 0, 0, 0.25);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 8px;
+                padding: 12px 14px;
                 color: #ffffff;
+                font-size: 14px;
             }
             QLineEdit:focus {
                 border: 1px solid #528bff;
+                background-color: rgba(0, 0, 0, 0.4);
             }
-            QPushButton {
-                background-color: #528bff;
+            QPushButton#actionButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00b23d, stop:1 #00d64a);
                 color: #ffffff;
                 font-weight: bold;
+                font-size: 15px;
                 border: none;
-                border-radius: 6px;
-                padding: 12px;
+                border-radius: 22px;
+                height: 44px;
+                padding: 10px;
             }
-            QPushButton:hover {
-                background-color: #4376db;
+            QPushButton#actionButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #00c744, stop:1 #00ea51);
             }
-            QPushButton:pressed {
-                background-color: #3562be;
+            QPushButton#actionButton:pressed {
+                background: #008f30;
             }
-            QPushButton#registerButton {
-                background-color: #3e4451;
-                color: #ffffff;
+            QPushButton#toggleLink {
+                background: none;
+                border: none;
+                color: #528bff;
+                text-decoration: underline;
+                font-weight: 500;
+                font-size: 13px;
             }
-            QPushButton#registerButton:hover {
-                background-color: #4c5364;
+            QPushButton#toggleLink:hover {
+                color: #6ea3ff;
+            }
+            QPushButton#toggleLink:pressed {
+                color: #3562be;
             }
             QLabel#errorLabel {
                 color: #e06c75;
@@ -76,58 +100,70 @@ class LoginWidget(QWidget):
                 font-weight: bold;
             }
             QFrame#cardFrame {
-                background-color: #21252b;
-                border: 1px solid #2b313c;
-                border-radius: 8px;
+                background-color: rgba(33, 37, 43, 0.7);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
             }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(20)
+        # Main Layout to center the Card container
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addStretch()
 
-        # Title Section
-        self.title_label = QLabel("Secure Chat Room", self)
+        center_v = QVBoxLayout()
+        center_v.addStretch()
+
+        # The Compact Card widget
+        self.card = QFrame(self)
+        self.card.setObjectName("cardFrame")
+        self.card.setFixedSize(380, 520)
+        
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setContentsMargins(30, 35, 30, 35)
+        card_layout.setSpacing(14)
+
+        # Title inside Card
+        self.title_label = QLabel("Good to see you again", self)
         self.title_label.setObjectName("titleLabel")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.title_label)
+        card_layout.addWidget(self.title_label)
 
-        # Connection Status indicator (Sub-Layout)
+        # Connection Status indicator inside Card
         self.status_layout = QHBoxLayout()
         self.status_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_layout.setSpacing(6)
         
-        # Indicator dot
         self.status_dot = QWidget(self)
-        self.status_dot.setFixedSize(10, 10)
-        self.status_dot.setStyleSheet("border-radius: 5px; background-color: #e06c75;")
+        self.status_dot.setFixedSize(8, 8)
+        self.status_dot.setStyleSheet("border-radius: 4px; background-color: #e06c75;")
         self.status_layout.addWidget(self.status_dot)
         
         self.status_text = QLabel("Checking connection...", self)
-        self.status_text.setStyleSheet("font-size: 12px;")
+        self.status_text.setStyleSheet("font-size: 11px; font-weight: normal; color: #8a92a5;")
         self.status_layout.addWidget(self.status_text)
         
-        layout.addLayout(self.status_layout)
+        card_layout.addLayout(self.status_layout)
+        card_layout.addSpacing(10)
 
-        # Card container for input fields
-        self.card = QFrame(self)
-        self.card.setObjectName("cardFrame")
-        card_layout = QVBoxLayout(self.card)
-        card_layout.setContentsMargins(20, 20, 20, 20)
-        card_layout.setSpacing(15)
-
-        form_layout = QFormLayout()
-        form_layout.setSpacing(12)
+        # Username Input Section
+        user_lbl = QLabel("Your Username", self)
+        user_lbl.setObjectName("fieldLabel")
+        card_layout.addWidget(user_lbl)
 
         self.username_input = QLineEdit(self)
-        self.username_input.setPlaceholderText("Enter username")
-        form_layout.addRow("Username:", self.username_input)
+        self.username_input.setPlaceholderText("👤  e.g. elon")
+        card_layout.addWidget(self.username_input)
+
+        # Password Input Section
+        pass_lbl = QLabel("Your Password", self)
+        pass_lbl.setObjectName("fieldLabel")
+        card_layout.addWidget(pass_lbl)
 
         self.password_input = QLineEdit(self)
-        self.password_input.setPlaceholderText("Enter password")
+        self.password_input.setPlaceholderText("🔒  ••••••••")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        form_layout.addRow("Password:", self.password_input)
-
-        card_layout.addLayout(form_layout)
+        card_layout.addWidget(self.password_input)
 
         # Validation error message placeholder
         self.error_label = QLabel("", self)
@@ -135,29 +171,48 @@ class LoginWidget(QWidget):
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.error_label.setWordWrap(True)
         card_layout.addWidget(self.error_label)
+        
+        card_layout.addStretch()
 
-        layout.addWidget(self.card)
+        # Green Pill Action Button
+        self.action_btn = QPushButton("Sign in", self)
+        self.action_btn.setObjectName("actionButton")
+        self.action_btn.clicked.connect(self._handle_action)
+        card_layout.addWidget(self.action_btn)
 
-        # Action Buttons
-        self.login_btn = QPushButton("Log In", self)
-        self.login_btn.clicked.connect(self._handle_login)
-        layout.addWidget(self.login_btn)
+        # Flat state switcher Link Button
+        self.toggle_link_btn = QPushButton("Don't have an account? Create one", self)
+        self.toggle_link_btn.setObjectName("toggleLink")
+        self.toggle_link_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_link_btn.clicked.connect(self._toggle_form_mode)
+        card_layout.addWidget(self.toggle_link_btn)
 
-        self.register_btn = QPushButton("Create Account", self)
-        self.register_btn.setObjectName("registerButton")
-        self.register_btn.clicked.connect(self._handle_registration)
-        layout.addWidget(self.register_btn)
+        center_v.addWidget(self.card)
+        center_v.addStretch()
 
-        layout.addStretch()
+        main_layout.addLayout(center_v)
+        main_layout.addStretch()
 
         self._update_connection_status()
 
+    def _toggle_form_mode(self):
+        self.is_register_mode = not self.is_register_mode
+        self.error_label.setText("")
+        if self.is_register_mode:
+            self.title_label.setText("Create your account")
+            self.action_btn.setText("Sign up")
+            self.toggle_link_btn.setText("Already have an account? Sign in")
+        else:
+            self.title_label.setText("Good to see you again")
+            self.action_btn.setText("Sign in")
+            self.toggle_link_btn.setText("Don't have an account? Create one")
+
     def _update_connection_status(self):
         if self.client.connected:
-            self.status_dot.setStyleSheet("border-radius: 5px; background-color: #98c379;")
+            self.status_dot.setStyleSheet("border-radius: 4px; background-color: #98c379;")
             self.status_text.setText("Connected (Secure TLS)")
         else:
-            self.status_dot.setStyleSheet("border-radius: 5px; background-color: #e06c75;")
+            self.status_dot.setStyleSheet("border-radius: 4px; background-color: #e06c75;")
             self.status_text.setText("Disconnected (Reconnecting...)")
 
     def _validate_inputs(self):
@@ -174,6 +229,12 @@ class LoginWidget(QWidget):
             
         self.error_label.setText("")
         return username, password
+
+    def _handle_action(self):
+        if self.is_register_mode:
+            self._handle_registration()
+        else:
+            self._handle_login()
 
     def _handle_login(self):
         if not self.client.connected:
@@ -228,6 +289,7 @@ class LoginWidget(QWidget):
                     if success:
                         self.error_label.setStyleSheet("color: #98c379; font-size: 12px; font-weight: bold;")
                         self.error_label.setText("Account created! Please log in.")
+                        self._toggle_form_mode() # Switch back to login mode automatically
                     else:
                         self.error_label.setStyleSheet("color: #e06c75; font-size: 12px; font-weight: bold;")
                         self.error_label.setText(msg)
