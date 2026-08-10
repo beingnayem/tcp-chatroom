@@ -1,6 +1,6 @@
 # Secure TCP Chat Application (TLS & PySide6 GUI)
 
-A professional, high-performance, multithreaded TCP Chat Application built in Python. Secure communications are handled natively via Transport Layer Security (TLS), featuring an elegant desktop interface built with PySide6, robust role-based access controls (RBAC), and chunked file transfers (FTProto).
+A professional, high-performance, multithreaded secure TCP Chat Application built in Python. Secure communications are handled natively via Transport Layer Security (TLS), featuring an elegant desktop interface built with PySide6, robust role-based access controls (RBAC), and persistent room-level communication boundaries.
 
 ---
 
@@ -14,11 +14,9 @@ graph TD
         GUI[PySide6 UI Thread]
         QueueTimer[QTimer Queue Poller]
         ClientSock[SocketClient Thread]
-        Uploader[File Uploader Thread]
         
         GUI <-->|Non-blocking Signals| QueueTimer
         QueueTimer <-->|Packet Queues| ClientSock
-        Uploader -->|TCP Stream| ClientSock
     end
 
     subgraph "TLS Cryptographic Layer"
@@ -41,7 +39,7 @@ graph TD
 
     ClientSock <--> TLSClient
     TLSServer <--> Acceptor
-  ```
+```
 
 ### Component Details
 
@@ -54,13 +52,12 @@ graph TD
 
 ## 2. Database Schema
 
-The system uses an SQLite relational database schema (`chat_room.db`) to enforce constraints, authenticate users, map room memberships, audit moderation actions, and track file chunks.
+The system uses an SQLite relational database schema (`chat_room.db`) to enforce constraints, authenticate users, map room memberships, and audit moderation actions.
 
 ```mermaid
 erDiagram
     users ||--o| permissions : "has"
     users ||--o{ messages : "sends"
-    users ||--o{ files : "transfers"
     rooms ||--o{ messages : "contains"
     rooms ||--o{ room_members : "tracks"
     users ||--o{ room_members : "joins"
@@ -69,14 +66,14 @@ erDiagram
         INTEGER id PK
         VARCHAR username UNIQUE
         VARCHAR password_hash
-        VARCHAR status "Online / Offline / Idle"
+        VARCHAR status
         TIMESTAMP last_seen
     }
 
     permissions {
         INTEGER id PK
         INTEGER user_id FK
-        VARCHAR role "Admin / Moderator / User"
+        VARCHAR role
     }
 
     rooms {
@@ -88,32 +85,21 @@ erDiagram
     room_members {
         INTEGER room_id FK
         INTEGER user_id FK
-        PRIMARY_KEY room_id_user_id
     }
 
     messages {
         INTEGER id PK
         INTEGER sender_id FK
-        INTEGER room_id FK "NULL for Private Messages"
-        INTEGER recipient_id FK "NULL for Room Broadcasts"
+        INTEGER room_id FK
+        INTEGER recipient_id FK
         TEXT content
         TIMESTAMP sent_at
     }
 
-    files {
-        INTEGER id PK
-        INTEGER sender_id FK
-        VARCHAR filename
-        INTEGER filesize
-        VARCHAR sha256_hash
-        VARCHAR status "Pending / Completed / Failed"
-        TIMESTAMP uploaded_at
-    }
-
     logs {
         INTEGER id PK
-        VARCHAR level "INFO / WARNING / ERROR"
-        VARCHAR source "SERVER / CLIENT"
+        VARCHAR level
+        VARCHAR source
         TEXT message
         TIMESTAMP timestamp
     }
@@ -121,38 +107,31 @@ erDiagram
 
 ---
 
-## 3. Protocol Specification (FTProto)
+## 3. Protocol Specification
 
-To support chunked transfer, resume logic, and integrity verification, the client and server exchange custom JSON-framed packets:
+To support reliable message exchange and layout state synchronization, the client and server exchange custom JSON-framed packets:
 
 ### Framing Format
 
 Each network packet is framed using a 4-byte big-endian integer specifying payload size, followed by the raw JSON payload.
 
-### Handshake Sequence & Resume Logic
+### Communication Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as Client (Sender)
+    actor Client as Client (User)
     participant Server as TLS Server
     
-    Note over Client,Server: Step 1: Handshake Metadata Init
-    Client->>Server: FILE_INIT (filename, filesize, checksum)
-    Note over Server: Server checks database & file path<br/>If 'Pending', checks bytes written
-    Server-->>Client: FILE_INIT_RESP (transfer_id, offset, status)
+    Note over Client,Server: Step 1: Request Room History on Selection
+    Client->>Server: GET_ROOM_HISTORY (room)
+    Note over Server: Server checks room membership
+    Server-->>Client: HISTORY (history_array)
     
-    Note over Client,Server: Step 2: Stream Chunks (Seeking to Offset)
-    loop Send Chunks
-        Note over Client: Seek to offset & read chunk_size bytes
-        Client->>Server: FILE_DATA (transfer_id, chunk_index, offset, data_b64, is_eof)
-        Server-->>Client: FILE_PROGRESS (transfer_id, bytes_written, progress_percentage)
-    end
-
-    Note over Client,Server: Step 3: Verify Integrity & Finalize
-    Note over Server: Server closes handle, computes SHA-256,<br/>compares against client checksum
-    Server-->>Client: FILE_COMPLETE (transfer_id, status=Success)
-    Server->>Client: Broadcasts FILE_NOTIFICATION packet
+    Note over Client,Server: Step 2: Live Message Exchange
+    Client->>Server: MSG (room, text)
+    Note over Server: Server saves to DB & broadcasts
+    Server-->>Client: MSG (sender, text)
 ```
 
 ---
@@ -237,6 +216,17 @@ sequenceDiagram
 }
 ```
 
+#### Create Room (`CREATE_ROOM`)
+
+```json
+{
+  "message_type": "CREATE_ROOM",
+  "payload": {
+    "room": "sweif"
+  }
+}
+```
+
 ---
 
 ## 5. UI Layout & Navigation Flow
@@ -244,14 +234,16 @@ sequenceDiagram
 The desktop GUI implements a modern dark-mode aesthetic with standard view navigation:
 
 ```text
-+-----------------------------------------------------------------+
-| Login / Register View                                           |
-|                                                                 |
-|   [  Username Input  ]                                          |
-|   [  Password Input  ]                                          |
-|   [      Log In      ]  ---> (Transitions to Chat Dashboard)   |
-|   [  Create Account  ]                                          |
-+-----------------------------------------------------------------+
++------------------------------------+
+| Login / Register Card (380x520)   |
+|                                    |
+|       Good to see you again        |
+|                                    |
+|   Your Username: [ 👤 e.g. elon  ] |
+|   Your Password: [ 🔒 •••••••••• ] |
+|   [            Sign in         ]   |
+|   Don't have an account? Create one|
++------------------------------------+
 
 Transitions to:
 
@@ -260,15 +252,13 @@ Transitions to:
 +-------------------+------------------------------+--------------+
 | Left Sidebar      | Center Chat Panel            | Right Panel  |
 |                   |                              |              |
-| [Rooms List]      | Room Header: #General        | [Online Users|
-| - General         | +--------------------------+ |  - Alice (ON)|
-| - TeamAlpha       | | Alice: Hello Bob!        | |  - Bob (Idl)|
-|                   | | System: Welcome Bob!     | |              |
-| [Transfer Hist]   | +--------------------------+ |              |
-| - report.pdf (OK) | [📁 File] [😊 Emoji] [Input] |              |
-|                   |                              |              |
-| [Admin Dashboard] | Active File Status Panel     |              |
-| [Log Out]         | ProgressBar [==========] 45% |              |
+| [Rooms List]      | Room Header: #General        | [Room Members]
+| - General         | +--------------------------+ |  🟢 Alice     |
+| - sweif           | | Alice: Hello Bob!        | |  ⚫ Bob       |
+| - another         | | System: Welcome Bob!     | |              |
+|                   | +--------------------------+ |              |
+| [Admin Dashboard] | [😊 Emoji] [Message Input]   |              |
+| [Log Out]         |                              |              |
 +-------------------+------------------------------+--------------+
 ```
 
@@ -317,7 +307,7 @@ pytest tests/test_secure_chat.py
 
 ### B. Run Performance Load Simulation
 
-Starts a performance test simulating 50 clients, message flood throughput, connection drops, and 5MB chunked transfers:
+Starts a performance test simulating 50 clients, message flood throughput, connection drops, and channel broadcast:
 
 ```bash
 python tests/test_performance_integration.py
@@ -365,14 +355,14 @@ sudo systemctl start secure-chat.service
 * **SSL Loading Failure (`ssl.SSLError: [SSL] key values mismatch`)**:
   Ensure the `server.crt` and `server.key` match and were generated in the directory where the server is executed.
 * **SQLite Database Lock (`sqlite3.OperationalError: database is locked`)**:
-  Verify that only one server instance is running on the machine. Multiple parallel client processes do not lock database tables, as they communicate solely via the single server instance.
+  Verify that only one server instance is running on the machine. Parallel client processes do not lock database tables, as they communicate solely via the single server instance.
 * **PySide6 Client Fails to Start on Linux (X11 connection issues)**:
-  Ensure `DISPLAY` environment variables are properly exported. If running inside Docker, configure X11 forwarding forwarding parameters.
+  Ensure `DISPLAY` environment variables are properly exported. If running inside Docker, configure X11 forwarding parameters.
 
 ---
 
 ## 10. Future Improvements
 
 1. **End-to-End Encryption (E2EE)**: Implement client-side cryptographic message encryption (e.g. Signal Double Ratchet algorithm), using server TLS purely as transport envelope routing.
-2. **Horizontal Clustering**: Implement Redis message brokers to sync states across multiple distributed servers.
+2. **Horizontal Clustering**: Implement Redis message brokers to sync states across distributed servers.
 3. **WebRTC Integration**: Integrate voice and video conferencing capabilities directly into the PySide6 client GUI.
