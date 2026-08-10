@@ -1,0 +1,8 @@
+tests/
+.venv/
+chat_room.db
+server_storage/
+server_uploads/
+temp_uploads/
+__pycache__/
+logs/
